@@ -14,44 +14,77 @@ class PostController extends Controller
 
     public function store(Request $request)
     {
-        try {
-            $this->validate($request, [
-                'title' => 'required|unique:posts|max:255|string',
-                'body' => 'required|string',
-            ]);
-            $post = new Post();
-            $post->title = $request->title;
-            $post->body = $request->body;
-            if ($post->save()) {
-                return response()->json(
-                    [
-                        'status' => 'success',
-                        'message' => 'Post created.',
-                    ],
-                    201
-                );
-            }
-        } catch (\Exception $e) {
+        $this->validate($request, [
+            'title' => 'required|unique:posts|max:255|string',
+            'body' => 'required|string',
+        ]);
+
+        $input = $request->only(['title', 'body']);
+        $post = new Post();
+        $post->fill($input);
+
+        if ($post->save()) {
+            return response()->json(
+                [
+                    'status' => 'success',
+                    'message' => 'Post created.',
+                ],
+                201
+            );
+        } else {
             return response()->json(
                 [
                     'status' => 'failed',
-                    'message' => $e->getMessage(),
+                    'message' => 'Failed.',
                 ],
                 412
             );
         }
+
+        return response()->json(
+            [
+                'status' => 'failed',
+                'message' => 'Error...',
+            ],
+            500
+        );
     }
 
     public function update(Request $request, $id)
     {
-        try {
+        $post = Post::find($id);
+        if ($post != null) {
+            // data type and length validation
             $this->validate($request, [
-                'title' => 'unique:posts|max:255|string',
+                'title' => 'max:255|string',
                 'body' => 'string',
             ]);
-            $post = Post::findOrFail($id);
-            $data = $request->all();
-            $post->fill($data);
+
+            $input = $request->all();
+
+            //unique check init
+            $except = [];
+
+            // unique check step 1
+            if ($request->filled('title')) {
+                if ($request->title === $post->title) {
+                    $except[] = 'title';
+                }
+            }
+
+            if (!empty($except)) {
+                $input = $request->except($except);
+            }
+
+            // unique check step 2
+            if (isset($input['title'])) {
+                $this->validate($request, [
+                    'title' => 'unique:posts',
+                ]);
+            }
+
+            $post->fill($input);
+
             if ($post->save()) {
                 return response()->json(
                     [
@@ -60,22 +93,39 @@ class PostController extends Controller
                     ],
                     200
                 );
+            } else {
+                return response()->json(
+                    [
+                        'status' => 'failed',
+                        'message' => 'Update failed.',
+                    ],
+                    412
+                );
             }
-        } catch (\Exception $e) {
+        } else {
             return response()->json(
                 [
                     'status' => 'failed',
-                    'message' => $e->getMessage(),
+                    'message' => 'Data not found.',
                 ],
-                412
+                404
             );
         }
+
+        return response()->json(
+            [
+                'status' => 'failed',
+                'message' => 'Error...',
+            ],
+            500
+        );
     }
 
-    public function destroy($id) {
-        try {
-            $post = Post::findOrFail($id);
+    public function destroy($id)
+    {
+        $post = Post::find($id);
 
+        if ($post != null) {
             if ($post->delete()) {
                 return response()->json(
                     [
@@ -85,14 +135,22 @@ class PostController extends Controller
                     200
                 );
             }
-        } catch (\Exception $e) {
+        } else {
             return response()->json(
                 [
                     'status' => 'failed',
-                    'message' => $e->getMessage(),
+                    'message' => 'Data not found.',
                 ],
-                412
+                404
             );
         }
+
+        return response()->json(
+            [
+                'status' => 'failed',
+                'message' => 'Error...',
+            ],
+            500
+        );
     }
 }
